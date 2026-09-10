@@ -1,0 +1,145 @@
+---
+title: "Lab04_Blumtritt"
+format: pdf
+editor: visual
+---
+
+O código abaixo foi usado para baixar o banco de dados, pois a planilha no google estava dando erro. Tmabém enviei o resultado do download para colegas de turma.
+```{r}
+#| eval: false
+# 1. Instala e carrega o pacote oficial do Google Drive
+if (!requireNamespace("googledrive", quietly = TRUE)) install.packages("googledrive")
+library(googledrive)
+
+# 2. ID da planilha extraído da sua imagem
+id_do_arquivo <- "1w8tdjEE4mhZVpzEk34fTfxbKdfpCybOO"
+
+cat("O R vai abrir uma aba no navegador para você autorizar o acesso ao seu Google Drive.\n")
+
+# 3. Faz o download do arquivo bruto (.xlsx) direto do servidor, sem conversões
+tryCatch({
+  drive_download(
+    as_id(id_do_arquivo),
+    path = "planilha_original.xlsx",
+    overwrite = TRUE
+  )
+  cat("\nDownload do Excel bruto concluído com sucesso!\n")
+  
+  # 4. Tenta ler o arquivo baixado localmente
+  if (!requireNamespace("readxl", quietly = TRUE)) install.packages("readxl")
+  dados_planilha <- readxl::read_excel("planilha_original.xlsx")
+  
+  # 5. Abre a visualização
+  View(dados_planilha)
+  
+}, error = function(e) {
+  cat("\nOcorreu um erro:\n", e$message, "\n")
+})
+```
+
+
+Q1. Carregue os pacotes readxl e tidyverse.
+
+```{r}
+library(readxl)
+library(tidyverse)
+```
+
+Q2. Crie uma variável chamada fname que contenha o caminho para o arquivo WDIEXCEL.xlsx, disponível no seu diretório de dados. Confirme que o R identifica a existência do arquivo utilizando o comando file.exists
+
+```{r}
+fname <- "wdiexcel.xlsx"
+file.exists(fname)
+```
+
+Q3. Leia a planilha “Country” e armazene no objeto countries.
+
+```{r}
+countries <- read_excel(fname, sheet = "Country")
+```
+
+Q4. Mantenha apenas os registros de 5 países (Brasil e outros 4 de sua escolha).
+
+```{r}
+paises <- c("BRA", "GRC", "MNE", "ALB", "MKD")
+countries_filtrado <- countries %>%
+  filter(`Country Code` %in% paises)
+```
+
+Q5. Leia a planilha “Data” e armazene no objeto WDI.
+
+```{r}
+WDI <- read_excel(fname, sheet = "Data")
+```
+
+Q6. Selecione apenas as colunas:
+
+- Country Code
+- Indicator Code
+- E todos os anos de 1960-2018
+
+```{r}
+intervalo_anos <- as.character(1960:2018)
+WDI_filtrado <- WDI %>%
+  select(`Country Code`, `Indicator Code`, all_of(intervalo_anos))
+```
+
+Q7. Confirme se os dados wm WDI estão em formato tidy. Se não estiverem, transforme-os para tal formato. Faça de forma que exista uma coluna referente ao ano chamada YEAR.
+
+```{r}
+WDI_TIDY <- WDI_filtrado %>%
+  pivot_longer(
+    cols = `1960`:`2018`,
+    names_to = "YEAR",
+    values_to = "value"
+  )
+```
+
+Q8. Confirme se a coluna referente ao ano está em formato inteiro.
+
+```{r}
+WDI_TIDY <- WDI_TIDY %>%
+  mutate(YEAR = as.integer(YEAR))
+is.integer(WDI_TIDY$YEAR)
+```
+
+Q9. Para o objeto WDI, mantenha apenas os registros dos países listados em countries. Selecione as colunas:
+
+- Country Code
+- Short Name
+- YEAR
+- SP.DYN.CBRT.IN
+
+```{r}
+WDI_countries <- WDI_TIDY %>%
+  filter(`Country Code` %in% countries_filtrado$`Country Code`) %>% 
+  filter(`Indicator Code` == "SP.DYN.CBRT.IN") %>%
+  inner_join(countries_filtrado %>% select(`Country Code`, `Short Name`), by = "Country Code") %>%
+  rename(SP.DYN.CBRT.IN = value) %>%
+  select(`Country Code`, `Short Name`, YEAR, SP.DYN.CBRT.IN)
+```
+
+Q10. Ordene o objeto de forma que, para cada país, as informações estejam ordenadas por ano.
+
+```{r}
+WDI_countries <- WDI_countries %>%
+  arrange(`Country Code`, YEAR)
+```
+
+Q11. Construa um gráfico de linhas, usando o pacote ggplot2, que tenha no eixo X a variável YEAR, no eixo Y a variável SP.DYN.CBRT.IN e que cada linha corresponda a um país diferente.
+
+```{r}
+ggplot(WDI_countries, aes(x = YEAR, y = SP.DYN.CBRT.IN, color = `Short Name`)) +
+  geom_line(linewidth = 1) + 
+  labs(
+    title = "Taxa Bruta de Natalidade (1960-2018)",
+    x = "Ano (YEAR)", 
+    y = "SP.DYN.CBRT.IN",
+    color = "País"
+  ) 
+```
+
+```{r}
+Sys.setenv(TZ = "America/Sao_Paulo")
+Sys.time()
+```
