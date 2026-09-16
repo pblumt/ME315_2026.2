@@ -1,0 +1,145 @@
+---
+title: "Lab05_Blumtritt"
+format: pdf
+editor: visual
+---
+
+
+```{r}
+library(tidyverse)
+library(lubridate)
+library(leaflet)
+library(scales)
+```
+
+```{r}
+#leitura em chunks filtrando por TAIL_NUMBER
+analisa_aeronave <- function(tail_number, arquivo, arquivo_airports = "airports.csv") {
+  callback_filtro <- readr::DataFrameCallback$new(function(chunk, pos) {
+    dplyr::filter(chunk, TAIL_NUMBER == tail_number)
+  })
+  dados_aeronave <- readr::read_csv_chunked(
+    file = arquivo,
+    callback = callback_filtro,
+    chunk_size = 100000,
+    show_col_types = FALSE
+  )
+  if (nrow(dados_aeronave) == 0) {
+    stop("Nenhum registro para essa aeronave")
+  }
+  
+#leitura dos aeroportos e renomeação das colunas selecionadas
+  dados_aeroportos <- readr::read_csv(arquivo_airports, show_col_types = FALSE) %>% 
+    select(
+      code = IATA_CODE,
+      lat  = LATITUDE,
+      lon  = LONGITUDE,
+      nome = AIRPORT
+    )
+
+#processamento da tabela
+  tabela_processada <- dados_aeronave %>%
+    filter(!is.na(DEPARTURE_TIME), !is.na(AIR_TIME)) %>%
+    mutate(
+      horario_partida_str = sprintf("%04d", as.integer(DEPARTURE_TIME)),
+      hora_partida = as.numeric(substr(horario_partida_str, 1, 2)),
+      minuto_partida = as.numeric(substr(horario_partida_str, 3, 4)),
+      data_hora = lubridate::make_datetime(YEAR, MONTH, DAY, hora_partida, minuto_partida),
+      velocidade_media_mph = (DISTANCE / AIR_TIME) * 60) %>%
+    arrange(data_hora) %>%
+    left_join(dados_aeroportos, by = c("ORIGIN_AIRPORT" = "code")) %>%
+    rename(lat_origem = lat, lon_origem = lon, nome_origem = nome) %>%
+    left_join(dados_aeroportos, by = c("DESTINATION_AIRPORT" = "code")) %>%
+    rename(lat_destino = lat, lon_destino = lon, nome_destino = nome) %>%
+    filter(!is.na(lat_origem), !is.na(lat_destino))
+  
+#construindo o mapa
+  mapa_trajeto <- leaflet() %>%
+    addTiles()
+  for (i in seq_len(nrow(tabela_processada))) {
+    voo_atual <- tabela_processada[i, ]
+    espessura_linha <- scales::rescale(
+      voo_atual$velocidade_media_mph,
+      to = c(2, 8),
+      from = c(100, 600)
+    )
+    mapa_trajeto <- mapa_trajeto %>%
+      addPolylines(
+        lng = c(voo_atual$lon_origem, voo_atual$lon_destino),
+        lat = c(voo_atual$lat_origem, voo_atual$lat_destino),
+        weight = ifelse(is.na(espessura_linha), 2, espessura_linha),
+        color = "red",
+        opacity = 0.6,
+        popup = paste0(
+          "<b>Voo: </b>", voo_atual$AIRLINE, " ", voo_atual$FLIGHT_NUMBER, "<br>",
+          "<b>Data/Hora: </b>", format(voo_atual$data_hora, "%d/%m/%Y %H:%M"), "<br>",
+          "<b>Trecho: </b>", voo_atual$ORIGIN_AIRPORT, " ➔ ", voo_atual$DESTINATION_AIRPORT, "<br>",
+          "<b>Velocidade Média: </b>", round(voo_atual$velocidade_media_mph, 1), " mph"
+        )
+      )
+  }
+  aeroportos_unicos <- bind_rows(
+    tabela_processada %>% select(IATA = ORIGIN_AIRPORT, lat = lat_origem, lon = lon_origem, nome = nome_origem),
+    tabela_processada %>% select(IATA = DESTINATION_AIRPORT, lat = lat_destino, lon = lon_destino, nome = nome_destino)
+  ) %>% distinct(IATA, .keep_all = TRUE)
+  mapa_trajeto <- mapa_trajeto %>%
+    addCircleMarkers(
+      data = aeroportos_unicos,
+      lng = ~lon,
+      lat = ~lat,
+      radius = 4,
+      color = "blue",
+      fillOpacity = 0.9,
+      popup = ~paste0("<b>", nome, "</b> (", IATA, ")")
+    )
+  return(list(
+    tabela = tabela_processada,
+    mapa = mapa_trajeto
+  ))
+}
+```
+
+O chunk abaixo é o responsável por gerar o mapa e a tabela, porém, para conseguir renderizar, pelo código conter readline(), que espera uma entrada, o chunk não é rodado.
+
+```{r}
+#| echo: true
+#| eval: false
+
+tail_input <- readline(prompt = "Digite o TAIL_NUMBER da aeronave (ex: N431WN): ")
+
+resultado <- analisa_aeronave(
+  tail_number = trimws(tail_input), 
+  arquivo = file.path("flights.csv.zip"),
+  arquivo_airports = file.path("airports.csv")
+)
+
+#ver a tabela em ordem
+head(resultado$tabela)
+
+#mapa interativo dos vôos
+resultado$mapa
+```
+
+Exemplo de chamada da função
+
+```{r}
+resultado <- analisa_aeronave(
+  tail_number = "N431WN", 
+  arquivo = file.path("flights.csv.zip"),
+  arquivo_airports = file.path("airports.csv")
+)
+
+#ver a tabela em ordem
+head(resultado$tabela)
+
+#mapa interativo dos vôos
+resultado$mapa
+```
+
+
+
+```{r}
+Sys.setenv(TZ = "America/Sao_Paulo")
+Sys.time()
+```
+
