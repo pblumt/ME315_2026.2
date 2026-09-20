@@ -1,0 +1,75 @@
+---
+title: "Lab07_Blumtritt"
+format: pdf
+editor: visual
+---
+
+1. Baixe o arquivo uwmadison.sqlite3. Conecte-se a ele usando o pacote RSQLite, armazenando a conexão em uma variável conn.
+
+```{r}
+library(DBI)
+library(RSQLite)
+
+conn <- dbConnect(SQLite(), "uwmadison.sqlite3")
+```
+
+2. Quem são e quantos são os professores que lecionaram disciplinas cujo tópico era estatística (subjects.abbreviation='STAT');
+
+```{sql connection=conn}
+WITH profs AS (
+    SELECT DISTINCT i.name FROM INSTRUCTORS I
+    JOIN TEACHINGS T ON I.id = T.instructor_id
+    JOIN SECTIONS SE ON SE.uuid = T.section_uuid
+    JOIN SUBJECT_MEMBERSHIPS SM ON SM.course_offering_uuid = SE.course_offering_uuid
+    JOIN SUBJECTS SU ON SU.code = SM.subject_code
+    WHERE SU.abbreviation = 'STAT')
+    
+SELECT name, (SELECT COUNT(*) FROM profs) AS total_professores FROM profs
+```
+
+
+3. O GPA americano é definido numa escala de 0 a 4, em que A = 4, AB = 3.5, B = 3, BC = 2.5, C = 2, D = 1 e F = 0. Determinando a nota média de cada oferecimento pela ponderação da quantidade de alunos em cada extrato com os valores numéricos de cada conceito, indique (no que se referente a disciplinas no assunto de estatística):
+
+Quem é o professor mais difícil?
+Quem é o professor mais fácil?
+
+```{sql connection=conn}
+WITH prof_dif AS (
+SELECT i.name AS professor, ROUND(SUM((g.a_count * 4.0) + (g.ab_count * 3.5) + (g.b_count * 3.0) + (g.bc_count * 2.5) + (g.c_count * 2.0) + (g.d_count * 1.0))/SUM(g.a_count + g.ab_count + g.b_count + g.bc_count + g.c_count + g.d_count + g.f_count), 3) AS MPOND FROM GRADE_DISTRIBUTIONS g
+JOIN SECTIONS s ON g.course_offering_uuid = s.course_offering_uuid AND g.section_number = s.number
+JOIN TEACHINGS t ON s.uuid = t.section_uuid
+JOIN INSTRUCTORS i ON t.instructor_id = i.id
+JOIN SUBJECT_MEMBERSHIPS sm ON g.course_offering_uuid = sm.course_offering_uuid
+JOIN SUBJECTS su ON sm.subject_code = su.code
+WHERE su.abbreviation = 'STAT'
+GROUP BY i.id, i.name
+HAVING SUM(g.a_count + g.ab_count + g.b_count + g.bc_count + g.c_count + g.d_count + g.f_count) > 0)
+
+SELECT * FROM prof_dif WHERE MPOND = (SELECT MIN(MPOND) FROM prof_dif) OR MPOND = (SELECT MAX(MPOND) FROM prof_dif)
+```
+Qual é a disciplina mais difícil?
+Qual é a disciplina mais fácil?
+
+```{sql connection=conn}
+WITH subj_dif AS (
+SELECT c.name AS disciplina, ROUND(SUM((g.a_count * 4.0) + (g.ab_count * 3.5) + (g.b_count * 3.0) + (g.bc_count * 2.5) + (g.c_count * 2.0) + (g.d_count * 1.0))/SUM(g.a_count + g.ab_count + g.b_count + g.bc_count + g.c_count + g.d_count + g.f_count), 3) AS MPOND FROM GRADE_DISTRIBUTIONS g
+JOIN SUBJECT_MEMBERSHIPS sm ON g.course_offering_uuid = sm.course_offering_uuid
+JOIN COURSE_OFFERINGS co ON g.course_offering_uuid = co.uuid
+JOIN COURSES c ON co.course_uuid = c.uuid
+JOIN SUBJECTS su ON sm.subject_code = su.code
+WHERE su.abbreviation = 'STAT'
+GROUP BY c.uuid, c.name, c.number
+HAVING SUM(g.a_count + g.ab_count + g.b_count + g.bc_count + g.c_count + g.d_count + g.f_count) > 0)
+SELECT * FROM subj_dif WHERE MPOND = (SELECT MIN(MPOND) FROM subj_dif) OR MPOND = (SELECT MAX(MPOND) FROM subj_dif)
+```
+
+4. Desconecte do banco de dados.
+
+```{r}
+dbDisconnect(conn)
+```
+
+```{r}
+Sys.setenv(TZ = "America/Sao_Paulo")
+Sys.time()
+```

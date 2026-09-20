@@ -1,0 +1,90 @@
+---
+title: "Lab06_Blumtritt"
+format: pdf
+editor: visual
+---
+
+1. Baixe o arquivo disco.db e armazene na variável path o caminho completo (pasta) na qual o arquivo foi gravado. Utilize o comando file.path() para combinar a variável path com o nome do arquivo (disco.db) e obter o nome do arquivo com seu respectivo caminho. Armazene este resultado na variável fname.
+
+```{r}
+path <- getwd()
+fname <- file.path(path, "disco.db")
+```
+
+2. Utilizando o pacote RSQLite, conecte-se ao arquivo de banco de dados. Armazene a conexão na variável conn.
+
+```{r}
+library(DBI)
+library(RSQLite)
+
+conn <- dbConnect(SQLite(), fname)
+```
+
+3. Liste as tabelas existentes no banco de dados.
+
+```{r}
+dbListTables(conn)
+```
+
+4. Identifique os nomes de todas as colunas existentes na tabela customers.
+
+```{r}
+dbListFields(conn, "customers")
+```
+
+5. Utilizando apenas SQLite, com o apoio do comando dbGetQuery, identifique quantos clientes estão atualmente cadastrados neste banco de dados.
+
+```{sql connection=conn}
+SELECT COUNT(*) AS total_clientes FROM CUSTOMERS
+```
+
+6. Utilizando apenas SQLite, identifique o número de países diferentes em que moram os clientes encontrados acima.
+
+```{sql connection=conn}
+SELECT COUNT(DISTINCT COUNTRY) AS paises_diferentes FROM CUSTOMERS
+```
+
+7. Utilizando apenas SQLite, quantos clientes existem por país? A tabela resultante deve conter o nome do país e a respectiva contagem, além de ser ordenada de maneira decrescente pela referida contagem.
+
+```{sql connection=conn}
+SELECT COUNTRY, COUNT(COUNTRY) AS clientes_no_pais FROM CUSTOMERS
+GROUP BY COUNTRY
+ORDER BY clientes_no_pais DESC
+```
+
+8. Quais são os 5 países com mais clientes registrados? Use apenas SQLite.
+
+```{sql connection=conn}
+SELECT COUNTRY FROM CUSTOMERS
+GROUP BY COUNTRY
+ORDER BY COUNT(COUNTRY) DESC
+LIMIT 5
+```
+
+9. Quais são os países registrados que possuem apenas 6 letras no nome?
+
+```{sql connection=conn}
+SELECT DISTINCT COUNTRY FROM CUSTOMERS
+WHERE LENGTH(COUNTRY) = 6
+```
+
+10. Quais foram as músicas compradas por clientes brasileiros?
+
+```{sql connection=conn}
+SELECT DISTINCT T.NAME AS nome_musica FROM CUSTOMERS C
+JOIN INVOICES I ON C.CUSTOMERID = I.CUSTOMERID
+JOIN INVOICE_ITEMS II ON I.INVOICEID = II.INVOICEID
+JOIN TRACKS T ON II.TRACKID = T.TRACKID
+WHERE C.COUNTRY = 'Brazil'
+```
+
+11. Desconecte do banco de dados.
+
+```{r}
+dbDisconnect(conn)
+```
+
+```{r}
+Sys.setenv(TZ = "America/Sao_Paulo")
+Sys.time()
+```
