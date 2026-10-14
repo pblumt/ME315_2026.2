@@ -1,0 +1,75 @@
+---
+title: "Lab08_Blumtritt"
+format: pdf
+editor: visual
+---
+
+```{python}
+import polars as pl
+
+df_basics = pl.read_csv("title.basics0.tsv.gz", separator="\t", null_values=r"\N")
+df_ratings = pl.read_csv("title.ratings.tsv.gz", separator="\t", null_values=r"\N")
+df_principals = pl.read_csv("title.principals0.tsv.gz", separator="\t", null_values=r"\N")
+
+# Apenas registros do tipo filme ('movie')
+df_movies = df_basics.filter(pl.col("titleType") == "movie")
+```
+
+1. Quais são os 5 filmes com as maiores notas (averageRating)? Apresente uma solução capaz de desempatar os filmes baseando-se no número de votos recebidos.
+
+```{python}
+res_q1 = (
+    df_movies
+    .join(df_ratings, on = "tconst", how = "inner")
+    .sort(["averageRating", "numVotes"], descending = [True, True])
+    .select(["primaryTitle", "averageRating", "numVotes"])
+    .head(5)
+)
+
+print("Top 5 filmes com maiores notas:")
+print(res_q1)
+```
+
+2. Qual é o gênero mais frequente entre os filmes com nota maior que 8?
+
+```{python}
+res_q2 = (
+    df_movies
+    .join(df_ratings, on = "tconst", how = "inner")
+    .filter(pl.col("averageRating") > 8)
+    .filter(pl.col("genres").is_not_null())
+    .with_columns(pl.col("genres").str.split(","))
+    .explode("genres")
+    .group_by("genres")
+    .len()
+    .sort("len", descending=True)
+    .head(1)
+)
+
+print("Gênero mais frequente em filmes com nota > 8:")
+print(res_q2)
+```
+
+3. Quais são os 3 atores/atrizes que mais participaram de filmes com nota maior que 7.5?
+
+```{python}
+res_q3 = (
+    df_movies
+    .join(df_ratings, on = "tconst", how = "inner")
+    .filter(pl.col("averageRating") > 7.5)
+    .join(df_principals, on = "tconst", how = "inner")
+    .filter(pl.col("category").is_in(["actor", "actress"]))
+    .group_by("nconst")
+    .len()
+    .sort("len", descending = True)
+    .head(3)
+)
+
+print("Top 3 atores/atrizes com mais participações em filmes com nota > 7.5:")
+print(res_q3)
+```
+
+```{r}
+Sys.setenv(TZ = "America/Sao_Paulo")
+Sys.time()
+```
