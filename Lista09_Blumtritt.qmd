@@ -1,0 +1,60 @@
+---
+title: "Lista09_Blumtritt"
+format: pdf
+editor: visual
+---
+
+## Lista 09
+
+1. Crie um banco de dados SQLite utilizando os 3 arquivos acima. O banco de dados deve conter as seguintes tabelas: basics, ratings e principals
+
+```{r}
+library(tidyverse)
+library(DBI)
+library(RSQLite)
+
+con <- dbConnect(RSQLite::SQLite(), "banco_lista09.sqlite")
+dbWriteTable(con, "basics", read_tsv("title.basics0.tsv.gz"), overwrite = TRUE)
+dbWriteTable(con, "ratings", read_tsv("title.ratings.tsv.gz"), overwrite = TRUE)
+dbWriteTable(con, "principals", read_tsv("title.principals0.tsv.gz"), overwrite = TRUE)
+```
+
+2. (Utilizando SQL, responda): Quais são os 5 filmes com as maiores notas (averageRating)? Apresente uma solução capaz de desempatar os filmes baseando-se no número de votos recebidos.
+
+```{sql connection=con}
+SELECT primaryTitle AS Filme, averageRating AS Nota_Media, numVotes AS Votos FROM basics B
+JOIN ratings R ON B.tconst = R.tconst
+WHERE titleType LIKE "movie"
+ORDER BY averageRating DESC, numVotes DESC
+LIMIT 5
+```
+
+3. (Utilizando SQL, responda): Qual é o gênero mais frequente entre os filmes com nota maior que 8?
+
+```{sql connection=con}
+SELECT TRIM(j.value) AS Genero, COUNT(*) AS Frequencia FROM basics B
+JOIN ratings R ON B.tconst = R.tconst
+JOIN json_each('["' || REPLACE(b.genres, ',', '","') || '"]') j
+WHERE averageRating > 8 AND titleType LIKE "movie" AND b.genres != "\N"
+GROUP BY genero
+ORDER BY frequencia DESC
+LIMIT 1
+```
+
+4. (Utilizando SQL, responda): Quais são os 3 atores/atrizes que mais participaram de filmes com nota maior que 7.5?
+
+```{sql connection=con}
+SELECT nconst AS Artista, COUNT(*) AS Quantidade FROM basics B
+JOIN ratings R ON B.tconst = R.tconst
+JOIN principals P ON B.tconst = P.tconst
+WHERE B.titleType = "movie" AND averageRating > 7.5 AND P.category IN ("actor", "actress")
+GROUP BY Artista
+ORDER BY Quantidade DESC
+LIMIT 3
+```
+
+```{r}
+dbDisconnect(con)
+Sys.setenv(TZ = "America/Sao_Paulo")
+Sys.time()
+```
