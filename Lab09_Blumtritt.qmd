@@ -1,0 +1,107 @@
+---
+title: "Lab09_Blumtritt"
+format: pdf
+editor: visual
+---
+
+# Lab 09
+
+1.  Importe o conjunto de dados diamonds, cujo arquivo está disponível no website da disciplina.
+
+```{python}
+import pandas as pd
+diamonds = pd.read_csv("diamonds.csv.gz")
+from plotnine import *
+import matplotlib.pyplot as plt
+```
+
+2.  Crie uma visualização de dados que descreva a associação existente entre as variáveis peso (carat) e preço (price). Que ações você tomou para garantir que você produziu um gráfico de boa qualidade? Escreva um parágrafo comunicando os seus achados.
+
+```{python}
+grafico_q2 = (
+    ggplot(diamonds, aes(x = "carat", y = "price"))
+    + geom_point(alpha = 0.1, color = "blue")
+    + geom_smooth(method = "lm", color = "red", se = True)
+    + scale_x_log10()
+    + scale_y_log10()
+    + labs(
+        title = "Associação entre Peso (Carat) e Preço de Diamantes (USD)",
+        x = "Peso (Quilates) - Escala Log10",
+        y = "Preço (USD) - Escala Log10",
+    )
+    + theme_minimal()
+)
+grafico_q2.save("grafico_q2.png", width=7, height=5, dpi=300)
+```
+![](grafico_q2.png)
+
+Para que todas as observações pudessem ser vistas (por serem muitas, ficariam sobrepostas), foi adicionado o alpha = 0.1, para dar translucidade a cada observação. A escala é ajustada de forma logarítmica para facilitar a visualização dos dados no intervalo amplo que acontecem, além de linearizá-la. É adicionada uma linha de tendência para mostrar o padrão geral dos dados e os eixos trazem as unidades de medida das variáveis.
+
+Após analisar o gráfico produzido, fica evidente uma correlação positiva entre o peso e o preço dos diamantes em escala logarítmica. A maioria das observações se encontra abaixo de 1 quilate, e números "redondos" (1, 1.5, 2) de quilates são mais comuns, o que mostra que o mercado de diamantes tem uma preferência por eles.
+
+
+3.  A relação identificada na questão anterior é a mesma relação presente nos diferentes cortes de diamantes? Crie uma visualização que demonstre seus achados eficientemente. Descreva sua conclusão em um parágrafo.
+
+```{python}
+ordem_corte = ["Fair", "Good", "Very Good", "Premium", "Ideal"]
+diamonds["cut"] = pd.Categorical(
+    diamonds["cut"], categories=ordem_corte, ordered=True
+)
+grafico_q3 = (
+    ggplot(diamonds, aes(x="carat", y="price", color="cut"))
+    + geom_point(alpha=0.1)
+    + geom_smooth(method="lm", se=False, color="black", size=0.8)
+    + facet_wrap("~cut", nrow=1)
+    + scale_x_log10()
+    + scale_y_log10()
+    + labs(
+        title="Relação Preço vs. Peso por Qualidade de Corte",
+        x="Peso (Quilates - Escala Log10)",
+        y="Preço (USD - Escala Log10)",
+        color="Corte",
+    )
+    + theme_minimal()
+)
+grafico_q3.save("grafico_q3.png", width=10, height=3.5, dpi=300)
+```
+![](grafico_q3.png)
+A relação positiva encontrada no exercício 2 segue presente dentro de cada corte. Porém, pode se observar que quanto melhor o corte, maior o valor que os diamantes alcançam quando comparados a cortes piores. 
+
+
+4.  Crie uma visualização que mostre a relação entre preço e peso do diamante, considerando as diferentes combinações de qualidade de corte, cor e clareza do diamante. Quais foram as dificuldades encontradas? A relação entre preço e peso é a mesma para diferentes configurações de diamantes?
+
+```{python}
+ordem_clareza = ["I1", "SI2", "SI1", "VS2", "VS1", "VVS2", "VVS1", "IF"]
+diamonds["clarity"] = pd.Categorical(
+    diamonds["clarity"], categories=ordem_clareza, ordered=True
+)
+grafico_q4 = (
+    ggplot(diamonds, aes(x="carat", y="price", color="clarity"))
+    + geom_smooth(method="lm", se=False, size=0.6)
+    + facet_grid("color ~ cut")
+    + scale_x_log10()
+    + scale_y_log10()
+    + labs(
+        title="Relação Preço vs. Peso por Corte, Cor e Clareza",
+        x="Peso (Quilates - Log10)",
+        y="Preço (USD - Log10)",
+        color="Clareza",
+    )
+    + theme_minimal()
+    + theme(
+        strip_text=element_text(size=8),
+        legend_position="bottom",
+        figure_size=(12, 10),
+    )
+)
+grafico_q4.save("grafico_q4.png", width=11, height=8, dpi=300)
+```
+![](grafico_q4.png)
+A maior dificuldade foi conseguir representar todos os dados em uma imagem só, 5 variáveis em mais de 50 mil observações iam criar uma sobreposição absurda de todos os dados. Para conseguir fazer isso, decidi usar retas de regressão dos dados para representá-los de forma que visualmente fosse mais fácil interpretá-los, além de criar múltiplas tabelas para cada caso. 
+
+Entre todas essas configurações, o padrão de quanto mais pesado maior o valor se mantém. Porém, quanto melhor a clareza, corte ou cor, o patamar inicial de valores também aumenta, o que leva a uma interpretação que o mercado realmente usa as quatro métricas para precificar os diamantes
+
+```{r}
+Sys.setenv(TZ = "America/Sao_Paulo")
+Sys.time()
+```
